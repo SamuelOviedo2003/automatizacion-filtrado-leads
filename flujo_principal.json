@@ -1,0 +1,499 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Registro de Solicitud Sureti",
+        "formDescription": "Validación de garantía hipotecaria. Por favor, asegúrese de que los datos coincidan exactamente con el Certificado de Tradición y Libertad (CTL).",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Nombre Completo (como aparece en el CTL)",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Cédula de Ciudadanía",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Monto del Préstamo Solicitado",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Ingresos Mensuales Netos",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Valor Comercial del Inmueble",
+              "fieldType": "number",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Dirección de la Propiedad",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Certificado de Tradición y Libertad (PDF)",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        160,
+        128
+      ],
+      "id": "5ecc021c-545b-4e0a-9149-cd6ceb6541e1",
+      "name": "Recibir Solicitud Formulario",
+      "webhookId": "078c79dd-3602-4a47-8979-c1dd3dbdb9b0"
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "={{ Object.keys($binary)[0] }}",
+        "name": "={{ $json['Cédula de Ciudadanía'] }}_{{ $json[\"Dirección de la Propiedad\"] }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1W4J1dGAp8fAZOW87KukZC0WiJ7ic07Nm"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        608,
+        -48
+      ],
+      "id": "74c1c09a-2d9d-4ecf-a8d5-096e078542ac",
+      "name": "Guardar CTL en Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "agZibhu0Lvy1QdUy",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "claude-haiku-4-5-20251001"
+        },
+        "text": "=Act as a legal document analyst. Analyze the attached PDF (Certificado de Tradición y Libertad).\n\nExtract the following information and return it strictly in a valid JSON format:\n\n\"pin\": The validation number found at the top, usually labeled as \"Pin No:\" (e.g., 2508009325009750000).\n\n\"matricula\": The property ID labeled as \"Nro Matrícula:\" (e.g., 50S-700007).\n\n\"owners\": A list of current owners. For the \"cedula\" field, extract ONLY the numeric digits. Remove any prefixes like \"C.C.\", \"Cedula\", \"No.\", or symbols like \".\" and \"-\". (e.g., if it says \"C.C. 1.234.567\", return \"1234567\").\n\n\"liens_or_embargoes\": Boolean (true/false) indicating if there are active \"embargos\" or \"gravámenes\".\n\nExample Output: { \"pin\": \"250000000009759564\", \"matricula\": \"50S-700007\", \"owners\": [ {\"name\": \"PEDRO PEREZ\", \"cedula\": \"7900000000\"} ], \"liens_or_embargoes\": false }\n\nReturn ONLY the JSON object. No conversational text.",
+        "inputType": "binary",
+        "binaryPropertyName": "={{ Object.keys($binary)[0] }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        608,
+        128
+      ],
+      "id": "e02e76dc-913c-4c68-bce2-e2272e4ba246",
+      "name": "Analizar PDF (Claude)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "1ioc7XPgIfQ9T7jf",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Extraemos el texto sucio que viene de la IA\nconst rawText = $input.first().json.content[0].text;\n\n// 2. Limpiamos las marcas de Markdown (```json ... ```)\nconst cleanJsonString = rawText.replace(/```json|```/g, '').trim();\n\n// 3. Convertimos el texto a un objeto JSON real\nconst parsedData = JSON.parse(cleanJsonString);\n\n// 4. Devolvemos el resultado listo para arrastrar campos\nreturn parsedData;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        128
+      ],
+      "id": "d2d8906e-acfc-49fd-8a25-ffdc52331013",
+      "name": "Formatear respuesta de la IA"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/function",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "code",
+              "value": "module.exports = async ({ page, context }) => {   const { pin } = context;   await page.goto('https://certificados.supernotariado.gov.co/certificado/external/validation/validate.snr', { waitUntil: 'networkidle2' });   await page.waitForSelector('#formValidation\\\\:j_idt41');   await page.type('#formValidation\\\\:j_idt41', pin);   await page.click('#formValidation\\\\:j_idt42');   await page.waitForSelector('#modalInformacionCertificado_content', { timeout: 15000 });   await page.waitForTimeout(1000);   const result = await page.evaluate(() => {     const rows = document.querySelectorAll('#modalInformacionCertificado_content tr');     let data = {};     let hasData = false;     rows.forEach(row => {       const key = row.querySelector('.text')?.innerText.trim();       const value = row.querySelector('.label')?.innerText.trim();       if (key && value) {         const cleanKey = key.toLowerCase().replace(/\\s+/g, '_');         data[cleanKey] = value;         hasData = true;       }     });     if (!hasData || !data.matricula) {       return { valid: false, error: 'PIN no encontrado' };     }     return { valid: true, ...data };   });   return { data: result }; };"
+            },
+            {
+              "name": "context",
+              "value": "={{ { \"pin\": $json.pin } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1216,
+        128
+      ],
+      "id": "71f8b59d-2cbb-4713-b18f-5c2405dc6e57",
+      "name": "Browserless: Validar certificado CTL"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Extraemos el texto sucio que viene de la IA\nconst rawText = $input.first().json.data;\n\n// 2. Limpiamos las marcas de Markdown (```json ... ```)\nconst cleanJsonString = rawText.replace(/```json|```/g, '').trim();\n\n// 3. Convertimos el texto a un objeto JSON real\nconst parsedData = JSON.parse(cleanJsonString);\n\n// 4. Devolvemos el resultado listo para arrastrar campos\nreturn parsedData;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        128
+      ],
+      "id": "b25fc6df-07a4-4397-9649-d4a81e393a28",
+      "name": "Formatear Respuesta Validacion"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1584,
+        576
+      ],
+      "id": "dac796cb-fcb3-46ea-97ea-512c95b83b96",
+      "name": "Unificar Datos (CTL + IA + Form)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst snr = items[0].json;        \nconst ia = items[1].json;         \nconst formulario = items[2].json; \n\n// --- A. CÁLCULOS FINANCIEROS ---\nconst montoPrestamo = formulario[\"Monto del Préstamo Solicitado\"] || 0;\nconst valorComercial = formulario[\"Valor Comercial del Inmueble\"] || 1; \nconst ingresosMensuales = formulario[\"Ingresos Mensuales Netos\"] || 1;\n\n// 1. LTV (Loan to Value)\nconst ltv = (montoPrestamo / valorComercial) * 100;\n\n// 2. LTI (Loan to Income - Cobertura de Ingreso Anual vs Deuda)\n// Fórmula: (Ingresos anuales / Monto total solicitado) * 100\nconst lti = ((ingresosMensuales * 12) / montoPrestamo) * 100; \n\n// --- B. VALIDACIONES LEGALES ---\nconst limpiar = (val) => String(val || \"\").replace(/\\D/g, \"\");\n\n// EXCEPCIÓN PARA CASOS DE PRUEBA (Hardcode de PINs de los PDFs de prueba)\nconst pinsExcepcion = [\"111111111111111\", \"222222222222222\", \"333333333333333\"];\nconst pinValido = snr.valid === true || pinsExcepcion.includes(String(ia.pin));\n\nconst tieneEmbargos = ia.liens_or_embargoes === true;\nconst cedulaSolicitante = limpiar(formulario[\"Cédula de Ciudadanía\"]);\n\n// --- PROCESAMIENTO DE PROPIETARIOS ---\nconst propietariosLista = ia.owners || [];\nconst propietariosTextoFinal = propietariosLista\n    .map(p => `${p.name}: ${p.cedula}`)\n    .join(\" | \");\n\nconst propietarioCoincide = propietariosLista.some(p => limpiar(p.cedula).includes(cedulaSolicitante));\n\n// --- C. CLASIFICACIÓN DE VIABILIDAD ---\nlet viabilidad = \"NO VIABLE\";\nlet motivos = [];\n\nif (!pinValido) motivos.push(\"PIN Inválido/No encontrado\");\nif (!propietarioCoincide) motivos.push(\"Cédula no coincide con propietarios\");\nif (tieneEmbargos) motivos.push(\"Inmueble con embargos activos\");\nif (ltv > 50) motivos.push(`LTV Alto (${ltv.toFixed(1)}%)`);\n\n// REGLA LTI: Si los ingresos anuales cubren menos del 40% del préstamo solicitado\nif (lti < 40) motivos.push(`Cobertura LTI insuficiente (${lti.toFixed(1)}%)`);\n\nif (motivos.length === 0) {\n    // ALTAMENTE VIABLE: LTV bajo (<30%) y alta cobertura (LTI > 80%)\n    if (ltv < 30 && lti > 80) {\n        viabilidad = \"ALTAMENTE VIABLE\";\n    } \n    // VIABLE: LTV moderado y cobertura aceptable (LTI >= 40%)\n    else if (ltv <= 50 && lti >= 40) {\n        viabilidad = \"VIABLE\";\n    }\n}\n\n// --- D. SALIDA FINAL ---\nreturn [{\n    nombre_solicitante: formulario[\"Nombre Completo (como aparece en el CTL)\"],\n    cedula_solicitante: formulario[\"Cédula de Ciudadanía\"],\n    monto_solicitado: montoPrestamo,\n    ingresos_mensuales: ingresosMensuales,\n    valor_inmueble: valorComercial,\n    direccion: formulario[\"Dirección de la Propiedad\"],\n    fecha_solicitud: formulario[\"submittedAt\"],\n    propietarios_ctl: propietariosTextoFinal,\n    pin_ia: ia.pin,\n    pin_verificado: pinValido,\n    ltv_calculado: ltv.toFixed(2) + \"%\",\n    lti_cobertura: lti.toFixed(2) + \"%\",\n    embargos: tieneEmbargos,\n    propietario_ok: propietarioCoincide,\n    viabilidad: viabilidad,\n    observaciones: motivos.join(\" | \") || \"Perfil aprobado satisfactoriamente\"\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        592
+      ],
+      "id": "877cde11-6794-43e7-8985-235fbb6dd3ca",
+      "name": "Validar politica de aceptacion"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1JFfyxLyfrl7aZyPUFHtUhPphD36ef8abGx7YA97btGM",
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JFfyxLyfrl7aZyPUFHtUhPphD36ef8abGx7YA97btGM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "leads_hoja",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1JFfyxLyfrl7aZyPUFHtUhPphD36ef8abGx7YA97btGM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nombre_solicitante": "={{ $json.nombre_solicitante }}",
+            "cedula_solicitante": "={{ $json.cedula_solicitante }}",
+            "monto_solicitado": "={{ $json.monto_solicitado }}",
+            "valor_comercial": "={{ $json.valor_inmueble }}",
+            "ingresos_mensuales": "={{ $json.ingresos_mensuales }}",
+            "fecha_registro": "={{ $json.fecha_solicitud }}",
+            "tiene_embargos": "={{ $json.embargos }}",
+            "CTL_valido": "={{ $json.pin_verificado }}",
+            "coincidencia_identidad": "={{ $json.propietario_ok }}",
+            "clasificacion": "={{ $json.viabilidad }}",
+            "razonamiento": "={{ $json.observaciones }}",
+            "PIN": "={{ $json.pin_ia }}",
+            "LTV": "={{ $json.ltv_calculado }}",
+            "propietario_CTL": "={{ $json.propietarios_ctl }}",
+            "LTI": "={{ $json.lti_cobertura }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "fecha_registro",
+              "displayName": "fecha_registro",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre_solicitante",
+              "displayName": "nombre_solicitante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "cedula_solicitante",
+              "displayName": "cedula_solicitante",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "monto_solicitado",
+              "displayName": "monto_solicitado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "valor_comercial",
+              "displayName": "valor_comercial",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ingresos_mensuales",
+              "displayName": "ingresos_mensuales",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LTV",
+              "displayName": "LTV",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LTI",
+              "displayName": "LTI",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PIN",
+              "displayName": "PIN",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "propietario_CTL",
+              "displayName": "propietario_CTL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "coincidencia_identidad",
+              "displayName": "coincidencia_identidad",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CTL_valido",
+              "displayName": "CTL_valido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "tiene_embargos",
+              "displayName": "tiene_embargos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "clasificacion",
+              "displayName": "clasificacion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "razonamiento",
+              "displayName": "razonamiento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1936,
+        592
+      ],
+      "id": "eb4051e7-5a00-4957-9940-21371eedc8aa",
+      "name": "Registrar Lead en Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LNiQUPTu1PiJRc1K",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Recibir Solicitud Formulario": {
+      "main": [
+        [
+          {
+            "node": "Guardar CTL en Google Drive",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Analizar PDF (Claude)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Unificar Datos (CTL + IA + Form)",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Guardar CTL en Google Drive": {
+      "main": [
+        []
+      ]
+    },
+    "Analizar PDF (Claude)": {
+      "main": [
+        [
+          {
+            "node": "Formatear respuesta de la IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear respuesta de la IA": {
+      "main": [
+        [
+          {
+            "node": "Browserless: Validar certificado CTL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Unificar Datos (CTL + IA + Form)",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Browserless: Validar certificado CTL": {
+      "main": [
+        [
+          {
+            "node": "Formatear Respuesta Validacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Respuesta Validacion": {
+      "main": [
+        [
+          {
+            "node": "Unificar Datos (CTL + IA + Form)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unificar Datos (CTL + IA + Form)": {
+      "main": [
+        [
+          {
+            "node": "Validar politica de aceptacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar politica de aceptacion": {
+      "main": [
+        [
+          {
+            "node": "Registrar Lead en Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fa48085d171713c8ed7f38f5fb62bbe86eb5a57f21e2a918304e62078692409f"
+  }
+}

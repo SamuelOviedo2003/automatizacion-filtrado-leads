@@ -1,0 +1,55 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -384,
+        32
+      ],
+      "id": "3870edcd-09c8-4805-bf22-8613c6879aba",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "sendTo": "oviedosamuel@gmail.com",
+        "subject": "Error en flujo",
+        "message": "Revisa el historial de ejecuciones",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -176,
+        32
+      ],
+      "id": "4bf3ba3b-178e-4d7d-ac4c-588ac055fa32",
+      "name": "Send a message",
+      "webhookId": "816b22ad-3e67-46bb-b7f3-ef56bc094c9a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "Ti0Th4XGfoGdeIqk",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "fa48085d171713c8ed7f38f5fb62bbe86eb5a57f21e2a918304e62078692409f"
+  }
+}
