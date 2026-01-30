@@ -77,5 +77,13 @@ docker run -d \
 
 ---
 
-## 5. Conclusión
+## 5. Próximos Pasos y Escalabilidad
+Con el fin de evolucionar este prototipo hacia una solución de grado producción, se proponen las siguientes mejoras:
+* **Despliegue en la Nube:** Migrar el flujo de n8n y el contenedor de Browserless de un entorno local a una arquitectura en la nube (AWS o GCP) para asegurar disponibilidad 24/7.
+* **Dashboard Interactivo:** Desarrollar una interfaz de búsqueda y visualización para consultar el histórico de leads y métricas clave de rendimiento.
+* **Estadísticas Avanzadas:** Implementar un módulo de analítica para identificar tendencias de viabilidad.
+* **Control de Errores Granular:** Expandir el sistema de alertas para incluir reintentos automáticos inteligentes y logs detallados en una base de datos externa.
+---
+
+## 6. Conclusión
 Se lograron satisfactoriamente todos los requisitos de la prueba, entregando una solución funcional que automatiza el análisis de riesgos, elimina la carga operativa manual y centraliza la información para la toma de decisiones inmediata mediante alertas visuales en tiempo real.
